@@ -9,3 +9,4 @@ google-generativeai==0.6.0
 upstash-redis==1.5.0
 sib-api-v3-sdk==7.6.0
 python-multipart==0.0.9
+email-validator==2.1.0
