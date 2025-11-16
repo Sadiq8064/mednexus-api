@@ -314,6 +314,82 @@ def create_key(
 
     return {"status": "success", "api_key": key}
 
+
+
+# ---------------------------------------------------------
+# EXTRA DEVELOPER ACCOUNT FEATURES
+# ---------------------------------------------------------
+
+@app.get("/dev/change-password")
+def change_password(
+    email: EmailStr = Query(...),
+    old_password: str = Query(...),
+    new_password: str = Query(...)
+):
+    user = dev_users_col.find_one({"email": email})
+    if not user:
+        raise HTTPException(404, "Developer not found")
+
+    if user["password"] != old_password:
+        raise HTTPException(401, "Old password does not match")
+
+    dev_users_col.update_one(
+        {"email": email},
+        {"$set": {"password": new_password}}
+    )
+
+    return {
+        "status": "success",
+        "message": "Password updated successfully"
+    }
+
+
+@app.get("/dev/delete-account")
+def delete_account(email: EmailStr = Query(...), password: str = Query(...)):
+    # Check developer user
+    user = dev_users_col.find_one({"email": email})
+    if not user:
+        raise HTTPException(404, "Developer not found")
+
+    if user["password"] != password:
+        raise HTTPException(401, "Wrong password")
+
+    # Delete API key(s)
+    api_keys_col.delete_many({"owner_email": email})
+
+    # Delete usage logs
+    api_usage_col.delete_many({"api_key": {"$exists": True}})
+
+    # Delete user
+    dev_users_col.delete_one({"email": email})
+
+    return {
+        "status": "success",
+        "message": "Developer account and all associated data deleted"
+    }
+
+
+@app.get("/dev/delete-key")
+def delete_key(
+    api_key: str = Query(...),
+    email: EmailStr = Query(...)
+):
+    key_doc = api_keys_col.find_one({"api_key": api_key})
+
+    if not key_doc:
+        raise HTTPException(404, "API key not found")
+
+    if key_doc["owner_email"] != email:
+        raise HTTPException(401, "Email does not own this API key")
+
+    # Delete API key
+    api_keys_col.delete_one({"api_key": api_key})
+
+    return {
+        "status": "success",
+        "message": "API key permanently deleted"
+    }
+
 @app.get("/dev/revoke-key")
 def revoke_key(api_key: str = Query(...), email: EmailStr = Query(...)):
     doc = api_keys_col.find_one({"api_key": api_key, "owner_email": email})
